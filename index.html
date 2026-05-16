@@ -31,8 +31,9 @@
     <div id="preloadContainer" class="fill-viewport"><div style="z-index: 4; position: absolute; overflow: hidden; left: 0%; top: 50%; width: 100.00%; height: 10.00%" ><div style="text-align:left; color:#000; "><DIV STYLE="text-align:center;font-size:1.6666666666666663vmin;"><SPAN STYLE="display:inline-block; letter-spacing:0vmin; white-space:pre-wrap;color:#777777;font-size:1.67vmin;font-family:Arial, Helvetica, sans-serif;">Loading virtual tour. Please wait...</SPAN></DIV></div></div></div>
     <div id="viewer" class="fill-viewport"></div>
 <script>
-// ⚠️ PEGA AQUÍ TU LINK MODIFICADO TERMINANDO EN /export?format=csv
-const URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1Iffh-VbZUFFYpI5sVI8HQAz6IPgACs_W2sq0iEH4iVo/export?format=csv"; 
+<script>
+// El enlace DEBE estar en una sola línea continua, sin presionar ENTER en medio:
+const URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRMFcvojrlaDKN4s8ZVL07tjKIp40UN_zvpXMbTtBXm_IhP4hYzsRcXpqGkAIQEhQgOmYn2b3PnVjR7/pub?output=csv";
 
 window.addEventListener("3dvista_loaded", function() {
     fetch(URL_GOOGLE_SHEETS)
@@ -44,42 +45,53 @@ window.addEventListener("3dvista_loaded", function() {
         filas.forEach(fila => {
             let columnas = fila.split(",");
             if(columnas.length >= 2) {
-                let nombre = columnas[0].trim();
+                // Limpiamos el nombre eliminando espacios, guiones bajos o mayúsculas para evitar errores de dedo
+                let nombreNormalizado = columnas[0].trim().toLowerCase().replace(/[\s_]/g, "");
                 let estado = columnas[1].trim().toLowerCase();
-                mapeo_lotes[nombre] = estado;
+                mapeo_lotes[nombreNormalizado] = estado;
             }
         });
 
-        // Esperamos a que el render de 3DVista monte los hotspots en pantalla
+        // Esperamos 3 segundos completos para garantizar que el mapa de 3DVista ya se dibujó en la pantalla
         setTimeout(() => {
             if (window.pano && window.pano.getPanoramas) {
                 let panos = window.pano.getPanoramas();
                 
-                // Buscamos los lotes en todos los panoramas del recorrido
                 panos.forEach(p => {
-                    for (let nombreLote in mapeo_lotes) {
-                        let estado = mapeo_lotes[nombreLote];
-                        let hotspot = p.getHotspot(nombreLote);
-                        
-                        if (hotspot) {
-                            if (estado === "vendido") {
-                                hotspot.set("fillColor", "#FF0000"); // Rojo
-                                hotspot.set("lineColor", "#FF0000");
-                                hotspot.set("fillOpacity", 0.6);
-                            } else if (estado === "disponible") {
-                                hotspot.set("fillColor", "#00FF00"); // Verde
-                                hotspot.set("lineColor", "#00FF00");
-                                hotspot.set("fillOpacity", 0.6);
+                    // Conseguimos todos los hotspots que dibujaste en este panorama
+                    let hotspots = p.getHotspots();
+                    
+                    hotspots.forEach(hotspot => {
+                        let nombreHotspot = hotspot.get("name");
+                        if (nombreHotspot) {
+                            // Normalizamos el nombre del hotspot de 3DVista igual que el del Excel
+                            let nombreHotspotNormalizado = nombreHotspot.toLowerCase().replace(/[\s_]/g, "");
+                            
+                            // Si coinciden, aplicamos el color correspondiente
+                            if (mapeo_lotes[nombreHotspotNormalizado]) {
+                                let estado = mapeo_lotes[nombreHotspotNormalizado];
+                                
+                                if (estado === "vendido") {
+                                    hotspot.set("fillColor", "#FF0000"); // Rojo
+                                    hotspot.set("lineColor", "#FF0000");
+                                    hotspot.set("fillOpacity", 0.6);
+                                } else if (estado === "disponible") {
+                                    hotspot.set("fillColor", "#00FF00"); // Verde
+                                    hotspot.set("lineColor", "#00FF00");
+                                    hotspot.set("fillOpacity", 0.6);
+                                }
+                                // Forzamos a 3DVista a redibujar el lote con el nuevo color
+                                if (typeof hotspot.update === "function") hotspot.update();
                             }
-                            if (typeof hotspot.update === "function") hotspot.update();
                         }
-                    }
+                    });
                 });
             }
-        }, 2500); 
+        }, 3000); 
     })
-    .catch(error => console.error('Error al conectar con Google Sheets:', error));
+    .catch(error => console.error('Error al conectar con el inventario de Google Sheets:', error));
 });
+</script>
 </script>
 </body>
 </html>
